@@ -28,8 +28,6 @@ client.on("message", (message) => {
 		homework(message);
 	} else if (command === "setprefix") {
 		changePrefix(message, args[0]);
-	} else if (command === "play") {
-		play(message, args[0]);
 	} else {
 		message.channel.send(`Unknown command! Try ${prefix}help`);
 		helpCommand(message);
@@ -94,20 +92,4 @@ function changePrefix(message, prefix) {
 	message.react("👍");
 }
 
-function play(message, video) {
-	if (!message.member.voice.channel) {
-		console.log("Please connect to voice channel");
-		return;
-	}
-	const connection = message.member.voice.channel.join();
-	const dispatcher = connection.play(video);
-
-	dispatcher.on("start", () => {
-		console.log(`${video} is now playing!`);
-	});
-	dispatcher.on("finish", () => {
-		console.log(`${video} has finished playing!`);
-	});
-	dispatcher.on("error", console.error);
-}
 client.login(config.BOT_TOKEN);
