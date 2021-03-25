@@ -60,29 +60,31 @@ function userInfo(message) {
 }
 
 function homework(message) {
-	let embed = new Discord.MessageEmbed();
-	embed.setColor("RANDOM");
-	embed.setTitle("Homework");
 	const mcv =
 		"https://www.mycourseville.com/?q=courseville/ical/302300-JOFYYNVX2PIS3VQJ97WT";
-
 	ical.fromURL(mcv, {}, (err, data) => {
-		var work = "";
+		let embed = new Discord.MessageEmbed();
+		let work, dateline;
+		embed.setColor("RANDOM");
+		embed.setTitle("Homework");
 		let date = Date.now();
 		for (let k in data) {
 			const event = data[k];
-			if (event.type == "VEVENT" && event.end > date) {
-				work += `• ${event.summary.slice(
-					16
-				)}\tDue to ${event.end.toLocaleTimeString(
+			if (
+				event.type == "VEVENT" &&
+				!event.summary.search("Assignment") &&
+				event.end > date
+			) {
+				work = `${event.summary.slice(event.summary.search(":") + 2)}`;
+				dateline = `Due to ${event.end.toLocaleTimeString(
 					"th-TH"
 				)} ${event.end.toLocaleDateString("th-TH")}\n`;
+				embed.addField(work, dateline, false);
 			}
 		}
-		message.channel.send(work == "" ? "Nothing" : work);
+		embed.setTimestamp();
+		message.channel.send(embed);
 	});
-	embed.setTimestamp();
-	message.channel.send(embed);
 	message.react("📚");
 }
 
