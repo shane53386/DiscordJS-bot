@@ -2,18 +2,23 @@ const Discord = require("discord.js");
 const config = require("./config.json");
 const ical = require("node-ical");
 const client = new Discord.Client();
+const prefix = require("discord-prefix");
 
-let prefix = config.PREFIX;
+let guildPrefix = config.PREFIX;
 
 client.on("ready", () => {
 	console.log(`Logged in as ${client.user.tag}!`);
 });
 
 client.on("message", (message) => {
-	if (message.author.bot) return;
-	if (!message.content.startsWith(prefix)) return;
+	let gPrefix = prefix.getPrefix(message.guild.id);
+	if (gPrefix) guildPrefix = gPrefix;
 
-	const commandBody = message.content.slice(prefix.length);
+	if (message.author.bot) return;
+	if (!message.guild) return;
+	if (!message.content.startsWith(guildPrefix)) return;
+
+	const commandBody = message.content.slice(guildPrefix.length);
 	const args = commandBody.split(" ");
 	const command = args.shift().toLowerCase();
 
@@ -29,7 +34,7 @@ client.on("message", (message) => {
 	} else if (command === "setprefix") {
 		changePrefix(message, args[0]);
 	} else {
-		message.channel.send(`Unknown command! Try ${prefix}help`);
+		message.channel.send(`Unknown command! Try ${guildPrefix}help`);
 		helpCommand(message);
 	}
 });
@@ -39,7 +44,7 @@ function helpCommand(message) {
 	embed.setColor("RANDOM");
 	embed.setTitle(`${message.guild.name}'s command`);
 	embed.addFields(
-		{ name: "Prefix", value: prefix, inline: false },
+		{ name: "Prefix", value: guildPrefix, inline: false },
 		{ name: "User's info", value: "info", inline: false },
 		{ name: "Homework", value: "hw", inline: false },
 		{ name: "Set prefix", value: "setprefix", inline: false }
@@ -88,9 +93,9 @@ function homework(message) {
 	message.react("📚");
 }
 
-function changePrefix(message, prefix) {
-	this.prefix = prefix;
-	message.channel.send(`Set new prefix to ${this.prefix}`);
+function changePrefix(message, nPrefix) {
+	prefix.setPrefix(nPrefix, message.guild.id);
+	message.channel.send(`Set new prefix to ${nPrefix}`);
 	message.react("👍");
 }
 
