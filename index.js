@@ -1,102 +1,69 @@
-const Discord = require("discord.js");
-const config = require("./config.json");
+require("dotenv").config();
+const { Client, Collection, Events, GatewayIntentBits } = require("discord.js");
+const fs = require("node:fs");
+const path = require("node:path");
 const ical = require("node-ical");
-const client = new Discord.Client();
-const prefix = require("discord-prefix");
 
-let guildPrefix = config.PREFIX;
+const client = new Client({
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+	],
+});
+client.commands = new Collection();
 
-client.on("ready", () => {
-	console.log(`Logged in as ${client.user.tag}!`);
+const commandsPath = path.join(__dirname, "commands");
+const commandFiles = fs
+	.readdirSync(commandsPath)
+	.filter((file) => file.endsWith(".js"));
+
+for (const file of commandFiles) {
+	const filePath = path.join(commandsPath, file);
+	const command = require(filePath);
+	// Set a new item in the Collection with the key as the command name and the value as the exported module
+	if ("data" in command && "execute" in command) {
+		client.commands.set(command.data.name, command);
+	} else {
+		console.log(
+			`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+		);
+	}
+}
+
+client.once(Events.ClientReady, (c) => {
+	console.log(`Logged in as ${c.user.tag}!`);
 });
 
-client.on("message", (message) => {
-	let gPrefix = prefix.getPrefix(message.guild.id);
-	if (gPrefix) guildPrefix = gPrefix;
+client.on(Events.InteractionCreate, async (interaction) => {
+	// console.log(interaction);
+	if (!interaction.isChatInputCommand()) return;
 
-	if (message.author.bot) return;
-	if (!message.guild) return;
-	if (!message.content.startsWith(guildPrefix)) return;
+	const command = interaction.client.commands.get(interaction.commandName);
 
-	const commandBody = message.content.slice(guildPrefix.length);
-	const args = commandBody.split(" ");
-	const command = args.shift().toLowerCase();
+	if (!command) {
+		console.error(
+			`No command matching ${interaction.commandName} was found.`
+		);
+		return;
+	}
 
-	if (command === "hi") {
-		message.react("👋");
-		message.channel.send(`Hi! ${message.author.username}`);
-	} else if (command === "help") {
-		helpCommand(message);
-	} else if (command === "info") {
-		userInfo(message);
-	} else if (command === "hw") {
-		homework(message);
-	} else if (command === "setprefix") {
-		changePrefix(message, args[0]);
-	} else {
-		message.channel.send(`Unknown command! Try ${guildPrefix}help`);
-		helpCommand(message);
+	try {
+		await command.execute(interaction);
+	} catch (error) {
+		console.error(error);
+		if (interaction.replied || interaction.deferred) {
+			await interaction.followUp({
+				content: "There was an error while executing this command!",
+				ephemeral: true,
+			});
+		} else {
+			await interaction.reply({
+				content: "There was an error while executing this command!",
+				ephemeral: true,
+			});
+		}
 	}
 });
 
-function helpCommand(message) {
-	let embed = new Discord.MessageEmbed();
-	embed.setColor("RANDOM");
-	embed.setTitle(`${message.guild.name}'s command`);
-	embed.addFields(
-		{ name: "Prefix", value: guildPrefix, inline: false },
-		{ name: "User's info", value: "info", inline: false },
-		{ name: "Homework", value: "hw", inline: false },
-		{ name: "Set prefix", value: "setprefix", inline: false }
-	);
-	embed.setTimestamp();
-	message.channel.send(embed);
-	message.react("🆘");
-}
-
-function userInfo(message) {
-	let embed = new Discord.MessageEmbed();
-	embed.setColor("RANDOM");
-	embed.setThumbnail(message.author.avatarURL());
-	embed.setTitle(`${message.author.username}'s info`);
-	embed.setTimestamp();
-	message.channel.send(embed);
-	message.react("ℹ");
-}
-
-function homework(message) {
-	const mcv =
-		"https://www.mycourseville.com/?q=courseville/ical/302300-JOFYYNVX2PIS3VQJ97WT";
-	ical.fromURL(mcv, {}, (err, data) => {
-		let embed = new Discord.MessageEmbed();
-		let work, dateline;
-		embed.setColor("RANDOM");
-		embed.setTitle("Homework");
-		let date = Date.now();
-		for (let k in data) {
-			const event = data[k];
-			if (
-				event.type == "VEVENT" &&
-				!event.summary.search("Assignment") &&
-				event.end > date
-			) {
-				work = `${event.summary.slice(event.summary.search(":") + 2)}`;
-				dateline = `Due to ${event.end.toLocaleTimeString(
-					"th-TH"
-				)} ${event.end.toLocaleDateString("th-TH")}\n`;
-				embed.addField(work, dateline, false);
-			}
-		}
-		embed.setTimestamp();
-		message.channel.send(embed);
-	});
-	message.react("📚");
-}
-
-function changePrefix(message, nPrefix) {
-	prefix.setPrefix(nPrefix, message.guild.id);
-	message.channel.send(`Set new prefix to ${nPrefix}`);
-	message.react("👍");
-}
-
-client.login(config.BOT_TOKEN);
+client.login(process.env.TOKEN);
